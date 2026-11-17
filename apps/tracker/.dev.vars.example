@@ -1,0 +1,3 @@
+# cp .dev.vars.example .dev.vars でローカル用のシークレットを用意する
+# OTLP受信口の取り込みトークン（技術定義書 8章）
+INGEST_TOKEN=dev-ingest-token
