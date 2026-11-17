@@ -157,8 +157,8 @@ pnpm wrangler secret put INGEST_TOKEN         # OTLP 受信口の取り込みト
 
 `@errorcloud/browser` と `@errorcloud/cli` は npm の `@errorcloud` 組織で公開している。公開は GitHub Actions（`.github/workflows/publish.yml`）が行う。
 
-1. パッケージの `package.json` の `version` を上げる PR を作る
-2. main にマージすると、npm にまだないバージョンのパッケージだけが公開される。`0.2.0-beta.1` のようなプレリリースは `next` タグで公開される
+1. パッケージの `package.json` の `version` を上げる PR を作り、`development` にマージする
+2. 自動で作られるリリース PR（`development` → `main`）をマージすると、npm にまだないバージョンのパッケージだけが公開される。`0.2.0-beta.1` のようなプレリリースは `next` タグで公開される
 
 認証には npm の [Trusted Publishing](https://docs.npmjs.com/trusted-publishers)（OIDC）を使うので、npm のトークンは GitHub に置かない。初めに一度だけ、各パッケージに信頼関係を登録する（npm 11.15 以上と 2 段階認証が必要）。
 

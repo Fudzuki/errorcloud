@@ -15,7 +15,7 @@ errorcloud に関心を持ってくれてありがとう。バグ報告、機能
 
 ### 手順
 
-1. リポジトリをフォークし、`main` から作業用のブランチを切る
+1. リポジトリをフォークし、`development` から作業用のブランチを切る
 2. [README](README.md#セットアップ) の手順で開発環境を用意する
 3. 変更を加え、必要ならテストを足す
 4. 次のコマンドがすべて通ることを確かめる
@@ -27,9 +27,15 @@ errorcloud に関心を持ってくれてありがとう。バグ報告、機能
    pnpm build
    ```
 
-5. `main` 向けに Pull Request を作り、テンプレートに沿って説明を書く
+5. `development` 向けに Pull Request を作り、テンプレートに沿って説明を書く
 
-`main` には Pull Request を通してだけ変更を入れる。直接のプッシュや force push はできない設定になっている。
+`development` と `main` には Pull Request を通してだけ変更を入れる。直接のプッシュや force push はできない設定になっている。
+
+### リリースの流れ
+
+- 既定ブランチは `development`。Pull Request はすべて `development` に入れる
+- `development` に変更が入ると、`main` へのリリース PR（`リリース: development → main`）が自動で作られる。すでにあれば本文が更新される（`.github/workflows/release-pr.yml`）
+- リリース PR を **Create a merge commit** でマージすると、`main` への push で npm への公開が動く（README の「パッケージの公開」）
 
 ### 変更するときの注意
 
