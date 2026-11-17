@@ -88,3 +88,11 @@ pnpm wrangler secret put ACCESS_AUD           # Access アプリケーション�
 ```
 
 受信口の流量制限には Workers Rate Limiting バインディング（`RATE_LIMITER`）を使う。使えないプランでは `wrangler.jsonc` の `ratelimits` を消せば、流量制限なしで動く（1 日の上限は効く）。
+
+## コントリビューション
+
+バグ報告や Pull Request を歓迎する。手順は [CONTRIBUTING.md](CONTRIBUTING.md) を参照。脆弱性は [SECURITY.md](SECURITY.md) の方法で非公開に報告してほしい。
+
+## ライセンス
+
+[MIT](LICENSE)

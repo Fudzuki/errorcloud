@@ -1,0 +1,56 @@
+name: バグ報告
+description: 期待どおりに動かない点を報告する
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとう。脆弱性に関わる内容は、この Issue ではなく [SECURITY.md](https://github.com/Fudzuki/errorcloud/blob/main/SECURITY.md) の方法で報告してほしい。
+        ログやスクリーンショットに、公開キー以外のシークレットやエンドユーザーの個人情報が含まれていないか確認してから貼ってほしい。
+  - type: dropdown
+    id: component
+    attributes:
+      label: 対象
+      options:
+        - トラッカー（Worker、受信口、管理 API）
+        - ダッシュボード
+        - ブラウザ SDK（@errorcloud/browser）
+        - CLI（@errorcloud/cli）
+        - ドキュメント
+        - その他・わからない
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 何が起きたか
+      description: 実際の動作と、期待した動作を書く
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 再現手順
+      placeholder: |
+        1. `pnpm dev` で起動する
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: ログ・エラーメッセージ
+      description: Worker のログ、ブラウザのコンソールなど。自動でコードブロックになる
+      render: shell
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境
+      description: 分かる範囲で
+      placeholder: |
+        - errorcloud のコミット: abc1234
+        - 動かしている場所: ローカル（pnpm dev） / Cloudflare 本番
+        - Cloudflare のプラン: Free / Paid
+        - ブラウザ: Chrome 140
+        - Node.js: 24.x
