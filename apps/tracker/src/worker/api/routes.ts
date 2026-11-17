@@ -19,6 +19,9 @@ import {
   toProject,
 } from "../projects";
 import { deleteProjectData, deleteProjectObjects } from "../retention";
+import { sourcemaps } from "./sourcemaps";
+import { traces } from "./traces";
+import { workers } from "./workers";
 
 export const api = new Hono<{ Bindings: AppEnv }>();
 
@@ -63,6 +66,7 @@ type EventRow = {
   url: string | null;
   user_agent: string | null;
   ray_id: string | null;
+  trace_id: string | null;
   r2_key: string;
 };
 
@@ -76,6 +80,7 @@ function toEventSummary(r: EventRow): EventSummary {
     url: r.url,
     userAgent: r.user_agent,
     rayId: r.ray_id,
+    traceId: r.trace_id,
   };
 }
 
@@ -499,3 +504,9 @@ api.get("/events/:id", async (c) => {
     return c.json({ error: "イベント本体が見つかりません（保持期間切れの可能性があります）" }, 404);
   return new Response(obj.body, { headers: { "Content-Type": "application/json" } });
 });
+
+// ---------------------------------------------------------------- 段階2〜4
+
+api.route("/sourcemaps", sourcemaps);
+api.route("/workers", workers);
+api.route("/", traces);

@@ -4,6 +4,7 @@ import type { Overview, Project } from "../../shared/types";
 import { api } from "../api";
 import { BarChart } from "../components/BarChart";
 import { Empty, ErrorBox, Loading, Section } from "../components/ui";
+import { UnassignedWorkers } from "../components/workers";
 import { count, relativeTime } from "../format";
 import { Link, navigate, useTitle } from "../router";
 
@@ -31,6 +32,8 @@ export function OverviewPage() {
       <Section title={`直近24時間のエラー ${count(total)} 件`}>
         <BarChart points={series} interval="hour" />
       </Section>
+
+      <UnassignedWorkers projects={projects} />
 
       <Section title="プロジェクト">
         {projects.length === 0 ? (

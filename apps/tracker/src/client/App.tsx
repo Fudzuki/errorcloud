@@ -1,6 +1,7 @@
 import { IssuePage } from "./pages/IssuePage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ProjectPage } from "./pages/ProjectPage";
+import { TracePage } from "./pages/TracePage";
 import { Link, useLocation } from "./router";
 
 function route(pathname: string) {
@@ -10,6 +11,8 @@ function route(pathname: string) {
   }
   m = /^\/issues\/([^/]+)\/?$/.exec(pathname);
   if (m?.[1]) return <IssuePage issueId={decodeURIComponent(m[1])} />;
+  m = /^\/traces\/([^/]+)\/?$/.exec(pathname);
+  if (m?.[1]) return <TracePage traceId={decodeURIComponent(m[1])} />;
   if (pathname === "/" || pathname === "") return <OverviewPage />;
   return (
     <div className="empty">

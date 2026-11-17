@@ -1,4 +1,10 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useState } from "react";
 import type {
   EventSummary,
@@ -6,14 +12,17 @@ import type {
   IssueStats,
   IssueStatus,
   Page,
+  Related,
+  StackFrame,
   StoredEvent,
 } from "../../shared/types";
 import { api, query } from "../api";
 import { BarChart } from "../components/BarChart";
-import { Empty, ErrorBox, Loading, Section, StatusBadge } from "../components/ui";
-import { count, dateTime, relativeTime, STATUS_LABEL } from "../format";
+import { Empty, ErrorBox, Loading, Section, SourceBadge, StatusBadge } from "../components/ui";
+import { count, dateTime, duration, relativeTime, STATUS_LABEL } from "../format";
 import { useProject } from "../hooks";
 import { Link, setSearch, useLocation, useTitle } from "../router";
+import { fetchSourceMap, mapPathOf, type ResolvedFrame, resolveFrame } from "../sourcemaps";
 
 // エラー文や URL は外部から届く信頼できない文字列。React のテキストとしてだけ描画し、
 // HTML として挿入したりリンクにしたりしない（技術定義書 6章）
@@ -56,6 +65,7 @@ export function IssuePage({ issueId }: { issueId: string }) {
           <h1 className="issue-heading">
             <span>{i.type}</span>
             <StatusBadge status={i.status} />
+            <SourceBadge source={i.source} />
           </h1>
           <p className="issue-message-full">{i.message}</p>
           {i.culprit && <p className="mono muted small">{i.culprit}</p>}
@@ -199,7 +209,16 @@ function EventDetail({ eventId }: { eventId: string }) {
   });
   if (event.isPending) return <Loading />;
   if (event.error) return <ErrorBox error={event.error} />;
-  const { event: e, frames, release, environment, userAgent, receivedAt } = event.data;
+  const {
+    event: e,
+    frames,
+    release,
+    environment,
+    userAgent,
+    receivedAt,
+    projectId,
+    worker,
+  } = event.data;
 
   return (
     <article className="event-detail">
@@ -208,6 +227,20 @@ function EventDetail({ eventId }: { eventId: string }) {
         <dd>{dateTime(receivedAt)}</dd>
         <dt>種類</dt>
         <dd>{e.kind}</dd>
+        {worker && (
+          <>
+            <dt>Worker</dt>
+            <dd className="mono">{worker.name}</dd>
+          </>
+        )}
+        {worker?.traceId && (
+          <>
+            <dt>トレース</dt>
+            <dd className="mono break">
+              <Link href={`/traces/${worker.traceId}`}>{worker.traceId}</Link>
+            </dd>
+          </>
+        )}
         {e.url && (
           <>
             <dt>URL</dt>
@@ -245,26 +278,7 @@ function EventDetail({ eventId }: { eventId: string }) {
         )}
       </dl>
 
-      <h3>スタックトレース</h3>
-      {frames.length === 0 ? (
-        <p className="muted small">スタックトレースはありません。</p>
-      ) : (
-        <ol className="frames">
-          {frames.map((f, idx) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: フレームは並び順そのものが識別子
-            <li key={idx} className={f.inApp ? "frame in-app" : "frame"}>
-              <span className="frame-fn">{f.function ?? "<anonymous>"}</span>
-              <span className="mono small break">
-                {f.file}
-                {f.line !== undefined && `:${f.line}:${f.column ?? 0}`}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-      <p className="muted small">
-        圧縮後の位置を表示しています（ソースマップでの復元にはまだ対応していません）。
-      </p>
+      <Frames frames={frames} projectId={projectId} release={release} />
       {e.stack && (
         <details>
           <summary>元のスタック文字列</summary>
@@ -277,6 +291,175 @@ function EventDetail({ eventId }: { eventId: string }) {
           <pre className="code">{JSON.stringify(e.extra, null, 2)}</pre>
         </details>
       )}
+      <RelatedPanel eventId={eventId} />
     </article>
+  );
+}
+
+// ---------------------------------------------------------------- スタック（ソースマップで復元）
+
+function Frames({
+  frames,
+  projectId,
+  release,
+}: {
+  frames: StackFrame[];
+  projectId: string;
+  release?: string;
+}) {
+  const [showOriginal, setShowOriginal] = useState(true);
+  const paths = release
+    ? [...new Set(frames.map((f) => mapPathOf(f.file)).filter((p): p is string => p !== null))]
+    : [];
+  const maps = useQueries({
+    queries: paths.map((path) => ({
+      queryKey: ["sourcemap", projectId, release, path],
+      queryFn: () => fetchSourceMap(projectId, release ?? "", path),
+      staleTime: Number.POSITIVE_INFINITY,
+      refetchInterval: false as const,
+      retry: false,
+    })),
+  });
+
+  if (frames.length === 0) {
+    return (
+      <>
+        <h3>スタックトレース</h3>
+        <p className="muted small">スタックトレースはありません。</p>
+      </>
+    );
+  }
+
+  const byPath = new Map(paths.map((p, i) => [p, maps[i]]));
+  const loading = maps.some((m) => m.isPending);
+  const failed = maps.find((m) => m.error)?.error;
+  const resolved: (ResolvedFrame | null)[] = frames.map((f) => {
+    const path = mapPathOf(f.file);
+    const map = path ? byPath.get(path)?.data : undefined;
+    return map ? resolveFrame(map, f) : null;
+  });
+  const resolvedCount = resolved.filter(Boolean).length;
+  const original = showOriginal && resolvedCount > 0;
+
+  return (
+    <>
+      <div className="frames-head">
+        <h3>スタックトレース</h3>
+        {resolvedCount > 0 && (
+          <label className="toggle small">
+            <input
+              type="checkbox"
+              checked={showOriginal}
+              onChange={(e) => setShowOriginal(e.target.checked)}
+            />
+            元の位置で表示
+          </label>
+        )}
+      </div>
+      <ol className="frames">
+        {frames.map((f, idx) => {
+          const r = original ? resolved[idx] : null;
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: フレームは並び順そのものが識別子
+            <li key={idx} className={f.inApp ? "frame in-app" : "frame"}>
+              <span className="frame-fn">
+                {r ? originalFunctionName(resolved, idx) : (f.function ?? "<anonymous>")}
+              </span>
+              <span className="mono small break">
+                {r
+                  ? `${r.source}:${r.line}:${r.column}`
+                  : `${f.file}${f.line !== undefined ? `:${f.line}:${f.column ?? 0}` : ""}`}
+              </span>
+              {r && r.context.length > 0 && f.inApp && (
+                <pre className="code context">
+                  {r.context.map(([n, text]) => (
+                    <span key={n} className={n === r.line ? "context-line hit" : "context-line"}>
+                      <span className="context-no">{n}</span>
+                      {text}
+                      {"\n"}
+                    </span>
+                  ))}
+                </pre>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <p className="muted small">
+        {!release
+          ? "リリースが指定されていないので、圧縮後の位置を表示しています（ソースマップはリリース名で結びつけます）。"
+          : loading
+            ? "ソースマップを読み込んでいます…"
+            : resolvedCount === 0
+              ? `リリース ${release} のソースマップが見つからないので、圧縮後の位置を表示しています。`
+              : original
+                ? `${resolvedCount} / ${frames.length} 個のフレームをソースマップで復元しました。`
+                : "圧縮後の位置を表示しています。"}
+      </p>
+      <ErrorBox error={failed} />
+    </>
+  );
+}
+
+/**
+ * 復元したフレームの関数名。ソースマップの name はその位置の識別子（呼び出し先の名前）なので、
+ * フレーム i の関数名は、1つ外側のフレーム i+1 の呼び出し位置で復元した name になる。
+ */
+function originalFunctionName(resolved: (ResolvedFrame | null)[], idx: number): string {
+  return resolved[idx + 1]?.name ?? "<anonymous>";
+}
+
+// ---------------------------------------------------------------- Ray ID での紐づけ（段階4）
+
+function RelatedPanel({ eventId }: { eventId: string }) {
+  const related = useQuery({
+    queryKey: ["related", eventId],
+    queryFn: () => api<Related>(`/events/${eventId}/related`),
+  });
+  if (related.isPending) return null;
+  if (related.error) return <ErrorBox error={related.error} />;
+  const { rayId, events, traces } = related.data;
+  if (events.length === 0 && traces.length === 0) {
+    return rayId ? (
+      <p className="muted small">Ray ID {rayId} に一致する Worker 側のイベントはありません。</p>
+    ) : null;
+  }
+
+  return (
+    <div className="related">
+      <h3>
+        関連するイベントとトレース{rayId && <span className="muted small"> Ray ID {rayId}</span>}
+      </h3>
+      {events.length > 0 && (
+        <ul className="related-list">
+          {events.map((e) => (
+            <li key={e.id}>
+              <Link href={`/issues/${e.issueId}?event=${e.id}`} className="related-row">
+                <SourceBadge source={e.source} />
+                <span className="strong">{e.type}</span>
+                <span className="issue-message">{e.message}</span>
+                <span className="muted small">{dateTime(e.ts)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {traces.length > 0 && (
+        <ul className="related-list">
+          {traces.map((t) => (
+            <li key={t.traceId}>
+              <Link href={`/traces/${t.traceId}`} className="related-row">
+                <span className="badge badge-trace">トレース</span>
+                <span className="mono">{t.worker}</span>
+                <span className="muted small">
+                  {t.durationMs !== null ? duration(t.durationMs) : ""}
+                </span>
+                <span className="muted small">{dateTime(t.ts)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

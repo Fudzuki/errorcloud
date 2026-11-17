@@ -2,7 +2,8 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { type SubmitEvent, useState } from "react";
 import type { Issue, Page, Project } from "../../shared/types";
 import { api, query } from "../api";
-import { Empty, ErrorBox, Loading, Section, StatusBadge } from "../components/ui";
+import { Empty, ErrorBox, Loading, Section, SourceBadge, StatusBadge } from "../components/ui";
+import { ProjectWorkers } from "../components/workers";
 import { count, relativeTime } from "../format";
 import { useProject } from "../hooks";
 import { Link, navigate, setSearch, useLocation, useTitle } from "../router";
@@ -179,6 +180,7 @@ function IssueList({ project }: { project: Project }) {
                 <Link href={`/issues/${i.id}`} className="issue-row">
                   <div className="issue-main">
                     <div className="issue-title">
+                      {i.source === "worker" && <SourceBadge source={i.source} />}
                       <span className="strong">{i.type}</span>
                       <span className="issue-message">{i.message}</span>
                     </div>
@@ -265,6 +267,19 @@ function Settings({ project }: { project: Project }) {
     });
   };
 
+  const tracker = location.origin;
+  const sentryDsn = `https://${project.publicKey}@<サイトのドメイン>/_e/sentry/1`;
+  const uploadCommand = `CF_ACCESS_CLIENT_ID=… CF_ACCESS_CLIENT_SECRET=… \\
+npx @errorcloud/cli sourcemaps upload \\
+  --url ${tracker} \\
+  --project ${project.id} \\
+  --release 2026.11.17-1 \\
+  --dir ./dist --delete-after`;
+  const wranglerSnippet = `"observability": {
+  "traces": { "enabled": true, "destinations": ["errorcloud-traces"] },
+  "logs": { "enabled": true, "destinations": ["errorcloud-logs"] }
+}`;
+
   const snippet = `import { init } from "@errorcloud/browser";
 
 init({
@@ -289,6 +304,54 @@ init({
           別の Cloudflare アカウントのサイトでは、<code>endpoint</code> にトラッカーのドメインの{" "}
           <code>https://…/_e</code> を指定する。
         </p>
+        <details>
+          <summary>Sentry の SDK をそのまま使う場合</summary>
+          <p className="small">
+            {
+              "DSN に次の値を指定すると、エラーのイベントだけを受け取って issue にします（セッションやパフォーマンスのデータは捨てます）。末尾の "
+            }
+            <code>1</code> は SDK の形式に合わせるための固定値です。
+          </p>
+          <pre className="code">{sentryDsn}</pre>
+        </details>
+      </Section>
+
+      <Section title="ソースマップ">
+        <p className="small">
+          ビルドのたびにソースマップをアップロードすると、issue
+          の画面でスタックを元のファイル名と行番号で表示します。<code>--release</code> は SDK の{" "}
+          <code>release</code> と同じ値にしてください。<code>--delete-after</code>{" "}
+          を付けると、公開する成果物から <code>.map</code> を削除します。
+        </p>
+        <pre className="code">{uploadCommand}</pre>
+        <p className="muted small">
+          Cloudflare Access のサービストークンを作り、Access
+          アプリケーションのポリシーで許可してから使います。
+        </p>
+      </Section>
+
+      <ProjectWorkers project={project} />
+
+      <Section title="Workers のログとトレース（OTLP）">
+        <ol className="guide small">
+          <li>
+            {
+              "Cloudflare ダッシュボードの Observability > Destinations で送信先を2つ作る（アカウントに1回）。エンドポイントは "
+            }
+            <code>{tracker}/otlp/v1/logs</code>
+            {" と "}
+            <code>{tracker}/otlp/v1/traces</code>
+            {"、カスタムヘッダーに "}
+            <code>{"Authorization: Bearer <取り込みトークン>"}</code>
+            {" を設定する。"}
+          </li>
+          <li>監視する Worker の wrangler 設定に送信先を指定してデプロイする。</li>
+          <li>
+            エラーが届くと概況の「未割り当ての
+            Worker」に出るので、このプロジェクトに割り当てる（上の欄から先に登録してもよい）。
+          </li>
+        </ol>
+        <pre className="code">{wranglerSnippet}</pre>
       </Section>
 
       <Section title="公開キー">
