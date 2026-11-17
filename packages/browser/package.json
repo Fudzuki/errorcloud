@@ -1,8 +1,24 @@
 {
   "name": "@errorcloud/browser",
-  "version": "0.0.0",
-  "type": "module",
+  "version": "0.1.0",
+  "description": "errorcloud のブラウザ SDK。エラーを捕捉して自分の Cloudflare 上の errorcloud に送る",
+  "keywords": [
+    "errorcloud",
+    "error-tracking",
+    "cloudflare",
+    "browser"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fudzuki/errorcloud.git",
+    "directory": "packages/browser"
+  },
+  "homepage": "https://github.com/Fudzuki/errorcloud#readme",
+  "bugs": {
+    "url": "https://github.com/Fudzuki/errorcloud/issues"
+  },
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -15,10 +31,15 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build"
   },
   "devDependencies": {
     "tsup": "^9.0.0",
     "vitest": "^5.1.0"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
   }
 }

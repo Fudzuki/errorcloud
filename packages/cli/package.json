@@ -1,8 +1,24 @@
 {
   "name": "@errorcloud/cli",
-  "version": "0.0.0",
-  "type": "module",
+  "version": "0.1.0",
+  "description": "errorcloud にソースマップをアップロードする CLI",
+  "keywords": [
+    "errorcloud",
+    "sourcemaps",
+    "cli",
+    "cloudflare"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fudzuki/errorcloud.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/Fudzuki/errorcloud#readme",
+  "bugs": {
+    "url": "https://github.com/Fudzuki/errorcloud/issues"
+  },
+  "type": "module",
   "bin": {
     "errorcloud": "./dist/index.js"
   },
@@ -12,11 +28,18 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --clean",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
     "tsup": "^9.0.0",
     "vitest": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

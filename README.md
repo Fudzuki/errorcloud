@@ -43,6 +43,10 @@ curl -X POST localhost:5173/_e/v1/events \
 
 ## ブラウザSDK
 
+```sh
+npm install @errorcloud/browser
+```
+
 ```ts
 import { captureException, init } from "@errorcloud/browser";
 
@@ -148,6 +152,15 @@ pnpm wrangler secret put INGEST_TOKEN         # OTLP 受信口の取り込みト
 ```
 
 受信口の流量制限には Workers Rate Limiting バインディング（`RATE_LIMITER`）を使う。使えないプランでは `wrangler.jsonc` の `ratelimits` を消せば、流量制限なしで動く（1 日の上限は効く）。
+
+## パッケージの公開
+
+`@errorcloud/browser` と `@errorcloud/cli` は npm の `@errorcloud` 組織で公開している。`package.json` の `version` を上げてから、ルートで次を実行する（`prepublishOnly` でビルドしてから公開される）。
+
+```sh
+npm login
+pnpm --filter @errorcloud/browser --filter @errorcloud/cli publish
+```
 
 ## コントリビューション
 
