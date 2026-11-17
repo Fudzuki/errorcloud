@@ -155,12 +155,22 @@ pnpm wrangler secret put INGEST_TOKEN         # OTLP 受信口の取り込みト
 
 ## パッケージの公開
 
-`@errorcloud/browser` と `@errorcloud/cli` は npm の `@errorcloud` 組織で公開している。`package.json` の `version` を上げてから、ルートで次を実行する（`prepublishOnly` でビルドしてから公開される）。
+`@errorcloud/browser` と `@errorcloud/cli` は npm の `@errorcloud` 組織で公開している。公開は GitHub Actions（`.github/workflows/publish.yml`）が行う。
+
+1. パッケージの `package.json` の `version` を上げる PR を作る
+2. main にマージすると、npm にまだないバージョンのパッケージだけが公開される。`0.2.0-beta.1` のようなプレリリースは `next` タグで公開される
+
+認証には npm の [Trusted Publishing](https://docs.npmjs.com/trusted-publishers)（OIDC）を使うので、npm のトークンは GitHub に置かない。初めに一度だけ、各パッケージに信頼関係を登録する（npm 11.15 以上と 2 段階認証が必要）。
 
 ```sh
 npm login
-pnpm --filter @errorcloud/browser --filter @errorcloud/cli publish
+npm trust github @errorcloud/browser --repo Fudzuki/errorcloud --file publish.yml --env npm --allow-publish
+npm trust github @errorcloud/cli --repo Fudzuki/errorcloud --file publish.yml --env npm --allow-publish
 ```
+
+ワークフローは GitHub の `npm` environment で動く。リポジトリの Settings > Environments で `npm` に承認者を設定すると、公開の前に承認を求められる。
+
+手元から公開する場合は、`npm login` のあとにルートで `pnpm --filter @errorcloud/browser --filter @errorcloud/cli publish` を実行する（`prepublishOnly` でビルドしてから公開される）。
 
 ## コントリビューション
 
