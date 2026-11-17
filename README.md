@@ -59,6 +59,51 @@ captureException(new Error("手動で送る"), { fingerprint: ["checkout"], extr
 
 error イベント、unhandledrejection、失敗した fetch（ネットワークエラーと 5xx、`cf-ray` 付き）を捕捉し、3 秒分を 60KB 以下のリクエストにまとめて送る。ページ離脱時は `sendBeacon` を使う。同じエラーは 1 ページ表示あたり 5 件まで。
 
+### Sentry の SDK から送る
+
+Sentry の SDK をそのまま使う場合は、DSN を次の形にする。SDK は `/_e/sentry/api/1/envelope/` に送るので、ルートと Access のバイパス設定はブラウザ SDK と共通で済む。envelope のうち `event` アイテムだけを issue にし、セッションやトランザクションなどは捨てる（Queue には積まない）。末尾の `1` は SDK の DSN の形式に合わせるための固定値で、プロジェクトは公開キーで決まる。
+
+```
+https://<公開キー>@<サイトのドメイン>/_e/sentry/1
+```
+
+## ソースマップ
+
+ビルドのたびにソースマップをアップロードすると、ダッシュボードがブラウザ内でスタックを元のファイル名・行番号・周辺のコードに戻して表示する。`--release` は SDK の `release` と同じ値にする。
+
+```sh
+CF_ACCESS_CLIENT_ID=… CF_ACCESS_CLIENT_SECRET=… \
+npx @errorcloud/cli sourcemaps upload \
+  --url https://errors.example.com \
+  --project my-site \
+  --release 2026.11.17-1 \
+  --dir ./dist \
+  --delete-after          # アップロードした .map を公開用の成果物から消す
+```
+
+JavaScript ごとに `sourceMappingURL` が指す `.map`（なければ隣の `<ファイル名>.map`）を探し、配信時のパス + `.map` をキーにして `PUT /api/sourcemaps/:project/:release/*` に送る。`dist` をサイトのルート以外で配信しているときは `--url-prefix static` のように指定する。`/api/*` は Access の内側にあるので、Access のサービストークンを作り、アプリケーションのポリシーで許可しておく。
+
+## Workers のエラーとトレース（OTLP）
+
+監視対象の Worker のログとトレースを OTLP で受け、エラーのログ（重大度 ERROR 以上か例外の属性を持つもの）と、エラーを含むトレースだけを残す。
+
+1. 取り込みトークンをシークレットに入れる: `pnpm wrangler secret put INGEST_TOKEN`
+2. Cloudflare ダッシュボードの Observability > Destinations で送信先を 2 つ作る。エンドポイントは `https://errors.example.com/otlp/v1/logs` と `/otlp/v1/traces`、カスタムヘッダーに `Authorization: Bearer <取り込みトークン>`
+3. 監視対象 Worker の wrangler 設定で送信先を指定する
+
+   ```jsonc
+   "observability": {
+     "traces": { "enabled": true, "destinations": ["errorcloud-traces"] },
+     "logs": { "enabled": true, "destinations": ["errorcloud-logs"] }
+   }
+   ```
+
+4. エラーが届くと、ダッシュボードの概況に「未割り当ての Worker」として出るので、プロジェクトに割り当てる（プロジェクト設定から先に登録してもよい）。割り当てるまでのエラーは件数だけ数えて捨てる
+
+Worker 名は `cloudflare.script_name`、`service.name`、`faas.name` の順に属性から読む。読めない場合は送信先の URL に `?worker=<名前>` を付ける。ブラウザの失敗した fetch に付いた `cf-ray` と Worker 側の `cloudflare.ray_id` が一致すると、イベントの画面に Worker 側のエラーとトレースが並ぶ。
+
+実データの形式（技術定義書 11 章の OTLP 関連の検証項目）は未確認で、公式ドキュメントの属性名と OpenTelemetry の意味規約（`exception.*`）を前提にしている。違っていた場合は `apps/tracker/src/worker/ingest/otlp.ts` 冒頭の定数を直す。
+
 ## よく使うコマンド
 
 ルートで実行する。
@@ -85,6 +130,7 @@ error イベント、unhandledrejection、失敗した fetch（ネットワー�
 cd apps/tracker
 pnpm wrangler secret put ACCESS_TEAM_DOMAIN   # https://<チーム名>.cloudflareaccess.com
 pnpm wrangler secret put ACCESS_AUD           # Access アプリケーションの AUD タグ
+pnpm wrangler secret put INGEST_TOKEN         # OTLP 受信口の取り込みトークン（未設定なら /otlp/* は 503）
 ```
 
 受信口の流量制限には Workers Rate Limiting バインディング（`RATE_LIMITER`）を使う。使えないプランでは `wrangler.jsonc` の `ratelimits` を消せば、流量制限なしで動く（1 日の上限は効く）。

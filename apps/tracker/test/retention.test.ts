@@ -45,6 +45,10 @@ describe("マイグレーション", () => {
   it("wrangler で適用済みのものは再適用しない", async () => {
     await ensureMigrated(env.DB);
     const { results } = await env.DB.prepare("SELECT name FROM d1_migrations ORDER BY name").all();
-    expect(results.map((r) => r.name)).toEqual(["0001_init.sql", "0002_project_usage.sql"]);
+    expect(results.map((r) => r.name)).toEqual([
+      "0001_init.sql",
+      "0002_project_usage.sql",
+      "0003_workers_and_rays.sql",
+    ]);
   });
 });

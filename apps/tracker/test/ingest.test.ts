@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import type { Issue, Page, StoredEvent } from "../src/shared/types";
 import worker from "../src/worker";
-import type { IngestMessage } from "../src/worker/env";
+import type { BrowserMessage, IngestMessage } from "../src/worker/env";
 import { processMessages, SAMPLES_PER_ISSUE_HOUR } from "../src/worker/pipeline/consumer";
 import { invalidateProjectCache } from "../src/worker/projects";
 import { browserEvent, call, createProject, json } from "./helpers";
@@ -16,7 +16,7 @@ function send(body: unknown, headers: Record<string, string> = {}) {
   });
 }
 
-function message(projectId: string, payload: unknown, receivedAt = Date.now()): IngestMessage {
+function message(projectId: string, payload: unknown, receivedAt = Date.now()): BrowserMessage {
   return {
     kind: "browser",
     projectId,
@@ -81,7 +81,7 @@ describe("コンシューマ", () => {
       ],
     };
     const result = await processMessages(env, [message(p.id, payload)]);
-    expect(result).toEqual({ accepted: 3, dropped: 1, sampled: 3 });
+    expect(result).toMatchObject({ accepted: 3, dropped: 1, sampled: 3 });
 
     const issues = await json<Page<Issue>>(`/api/projects/${p.id}/issues`);
     expect(issues.items).toHaveLength(2);

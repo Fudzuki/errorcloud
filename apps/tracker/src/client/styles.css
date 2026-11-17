@@ -562,3 +562,161 @@ summary {
     gap: 20px;
   }
 }
+
+/* ---------------------------------------------------------------- 段階2〜4 */
+
+.badge-source-worker {
+  background: color-mix(in srgb, var(--link) 14%, transparent);
+  color: var(--link);
+}
+
+.badge-source-browser,
+.badge-trace {
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--muted);
+}
+
+.frames-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.code.context {
+  margin: 6px 0 2px;
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.context-line {
+  display: block;
+  padding: 0 10px;
+  white-space: pre;
+}
+
+.context-line.hit {
+  background: var(--danger-bg);
+}
+
+.context-no {
+  display: inline-block;
+  min-width: 3.5em;
+  margin-right: 10px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.related {
+  margin-top: 16px;
+}
+
+.related-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.related-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.related-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.related-row:hover {
+  background: color-mix(in srgb, var(--link) 6%, transparent);
+}
+
+.related-row .issue-message {
+  flex: 1;
+}
+
+.worker-list {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.worker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.worker-when {
+  flex: 1;
+}
+
+.waterfall {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.span-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 32%) 1fr 64px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.span-row:hover,
+.span-row.active {
+  background: color-mix(in srgb, var(--link) 8%, transparent);
+}
+
+.span-name {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.span-track {
+  position: relative;
+  height: 10px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+
+.span-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  background: var(--link);
+}
+
+.span-bar.error {
+  background: var(--accent);
+}
+
+.span-dur {
+  text-align: right;
+}

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { requireAccess } from "./api/access";
 import { api } from "./api/routes";
 import type { AppEnv, IngestMessage } from "./env";
+import { otlp } from "./ingest/otlp-receiver";
 import { receiver } from "./ingest/receiver";
 import { ensureMigrated } from "./migrate";
 import { processMessages } from "./pipeline/consumer";
@@ -12,6 +13,7 @@ export type { IngestMessage } from "./env";
 const app = new Hono<{ Bindings: AppEnv }>();
 
 app.route("/_e", receiver);
+app.route("/otlp", otlp);
 
 app.get("/api/health", async (c) => {
   const row = await c.env.DB.prepare("SELECT 1 AS ok").first<{ ok: number }>();

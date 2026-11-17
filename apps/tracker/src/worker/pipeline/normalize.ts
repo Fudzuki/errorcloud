@@ -15,6 +15,29 @@ const GECKO_FRAME = /^\s*(.*?)@((?:[a-z][a-z0-9+.-]*:\/\/|\/)[^\s@]*?):(\d+):(\d
 
 const EXTENSION_SCHEME = /^(?:chrome|moz|safari|safari-web|ms-browser)-extension:\/\//i;
 
+// Workers: "    at Object.fetch (index.js:12:11)"。ファイル名はスキームも "/" も付かないことがある
+const WORKER_FRAME = /^\s*at (?:(?:async )?(.+?) \()?([^\s()]+?):(\d+):(\d+)\)?\s*$/;
+
+/** Workers のスタックを読む。node: や cloudflare: の組み込みと node_modules はアプリ外とみなす */
+export function parseWorkerStack(stack: string | undefined): StackFrame[] {
+  if (!stack) return [];
+  const frames: StackFrame[] = [];
+  for (const line of stack.split("\n")) {
+    const m = WORKER_FRAME.exec(line);
+    if (!m) continue;
+    const [, fn, file = "", lineNo, col] = m;
+    frames.push({
+      function: fn?.trim() || undefined,
+      file,
+      line: Number(lineNo),
+      column: Number(col),
+      inApp: !/^(?:node|cloudflare|internal|workerd):/.test(file) && !file.includes("node_modules"),
+    });
+    if (frames.length >= MAX_FRAMES) break;
+  }
+  return frames;
+}
+
 export function parseStack(stack: string | undefined, pageUrl?: string): StackFrame[] {
   if (!stack) return [];
   let pageHost: string | undefined;
@@ -164,11 +187,28 @@ export async function sha256Hex(input: string): Promise<string> {
  * エラーの型、正規化したメッセージ、最上位のアプリ内フレームのファイル名を連結した SHA-256。
  * 行番号と関数名は含めない（リリースのたびに変わるため）。
  */
-export async function fingerprintOf(event: BrowserEvent, culprit: string | null): Promise<string> {
+export async function fingerprintOf(
+  event: BrowserEvent,
+  culprit: string | null,
+  /** Worker 由来なら Worker 名。同じプロジェクトの別の Worker のエラーを分ける */
+  scope?: string,
+): Promise<string> {
   if (event.fingerprint && event.fingerprint.length > 0) {
     return sha256Hex(`custom\n${event.fingerprint.join("\n")}`);
   }
-  return sha256Hex([event.type, normalizeMessage(event.message), culprit ?? ""].join("\n"));
+  const parts = [event.type, normalizeMessage(event.message), culprit ?? ""];
+  if (scope !== undefined) parts.push(`worker:${scope}`);
+  return sha256Hex(parts.join("\n"));
+}
+
+/**
+ * Ray ID を突き合わせ用の形にそろえる。cf-ray ヘッダーは末尾にデータセンター名が付く
+ * （例: 8f0c1234abcd5678-NRT）ので除き、小文字にする。
+ */
+export function normalizeRayId(raw: string | undefined | null): string | undefined {
+  if (!raw) return undefined;
+  const id = raw.trim().split("-")[0]?.toLowerCase();
+  return id && /^[0-9a-f]{8,32}$/.test(id) ? id : undefined;
 }
 
 /** issue の ID はプロジェクトとフィンガープリントから決める。並行するバッチでも同じ ID になる */

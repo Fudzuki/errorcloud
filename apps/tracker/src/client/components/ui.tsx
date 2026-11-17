@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { IssueStatus } from "../../shared/types";
+import type { EventSource, IssueStatus } from "../../shared/types";
 import { STATUS_LABEL } from "../format";
 
 export function ErrorBox({ error }: { error: unknown }) {
@@ -21,6 +21,14 @@ export function Empty({ children }: { children: ReactNode }) {
 
 export function StatusBadge({ status }: { status: IssueStatus }) {
   return <span className={`badge badge-${status}`}>{STATUS_LABEL[status]}</span>;
+}
+
+export function SourceBadge({ source }: { source: EventSource }) {
+  return (
+    <span className={`badge badge-source-${source}`}>
+      {source === "worker" ? "Worker" : "ブラウザ"}
+    </span>
+  );
 }
 
 export function Section({

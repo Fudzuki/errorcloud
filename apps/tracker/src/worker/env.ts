@@ -1,3 +1,5 @@
+import type { TraceRecord, WorkerEvent } from "./ingest/otlp";
+
 // wrangler types が生成する Env に、シークレットと任意のバインディングを足した型
 
 export type AppEnv = Env & {
@@ -13,11 +15,25 @@ export type AppEnv = Env & {
   RATE_LIMITER?: RateLimit;
 };
 
-/** Queue に積むメッセージ。1リクエストを1メッセージにする（技術定義書 3章） */
-export type IngestMessage = {
+/**
+ * Queue に積むメッセージ。1リクエストを1メッセージにする（技術定義書 3章）。
+ * OTLP は受信口でエラーだけに絞り、128KB を超えるときだけ複数のメッセージに分ける。
+ */
+export type IngestMessage = BrowserMessage | WorkerMessage;
+
+export type BrowserMessage = {
   kind: "browser";
   projectId: string;
   receivedAt: number;
   userAgent?: string;
+  /** BrowserPayload の JSON。Sentry 互換の受信口（段階5）も変換してからこの形で積む */
   body: string;
+};
+
+/** OTLP 受信口（段階3）から。プロジェクトはコンシューマが Worker 名から引く */
+export type WorkerMessage = {
+  kind: "worker";
+  receivedAt: number;
+  events: WorkerEvent[];
+  traces: TraceRecord[];
 };
