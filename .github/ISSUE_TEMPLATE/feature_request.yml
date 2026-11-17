@@ -1,0 +1,29 @@
+name: 機能の提案
+description: 新しい機能や改善を提案する
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 困っていること
+      description: どんな場面で、何に困っているか
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案
+      description: どうなればよいか
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 検討したほかの方法
+      description: 今の機能での回避策や、ほかの実現方法があれば
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: 実装について
+      options:
+        - label: 自分で Pull Request を送ってもよい

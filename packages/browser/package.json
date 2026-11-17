@@ -2,6 +2,7 @@
   "name": "@errorcloud/browser",
   "version": "0.0.0",
   "type": "module",
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
