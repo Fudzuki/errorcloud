@@ -1,4 +1,5 @@
-// ローカル開発用の設定。本番の routes や database_id は技術定義書 9章を参照して追加する。
+// D1・R2・Queue の ID は書かない。初回のデプロイで wrangler が自動で作って紐づける（README の「デプロイ」）。
+// 独自ドメインで動かす場合は routes を追加する（技術定義書 9章）。
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "errorcloud",
@@ -13,7 +14,6 @@
     {
       "binding": "DB",
       "database_name": "errorcloud",
-      "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
   ],
