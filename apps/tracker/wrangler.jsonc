@@ -1,0 +1,27 @@
+// ローカル開発用の設定。本番の routes や database_id は技術定義書 9章を参照して追加する。
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "errorcloud",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/_e/*", "/otlp/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "errorcloud",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "errorcloud" }],
+  "queues": {
+    "producers": [{ "binding": "INGEST", "queue": "errorcloud-ingest" }],
+    "consumers": [{ "queue": "errorcloud-ingest", "max_batch_size": 100, "max_batch_timeout": 5 }]
+  },
+  "triggers": { "crons": ["0 18 * * *"] },
+  "observability": { "enabled": true }
+}
