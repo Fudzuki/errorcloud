@@ -75,6 +75,20 @@ error イベント、unhandledrejection、失敗した fetch（ネットワー�
 
 マイグレーションは `apps/tracker/migrations/` に連番の SQL で追加する。テストは実行時にこのディレクトリのマイグレーションを自動で適用する。
 
+## MCP サーバー
+
+ルートの `.mcp.json` に、このリポジトリの開発で使う MCP サーバーを登録している。Claude Code などの MCP クライアントでリポジトリを開くと、プロジェクト用のサーバーとして使うかどうかを確認される。
+
+| 名前                       | 用途                                                         | 認証                        |
+| -------------------------- | ------------------------------------------------------------ | --------------------------- |
+| `cloudflare-docs`          | Workers、D1、R2、Queues などの Cloudflare ドキュメントの検索 | 不要                        |
+| `cloudflare-bindings`      | 自分のアカウントの Worker、D1、R2 などの参照と操作           | Cloudflare の OAuth         |
+| `cloudflare-observability` | デプロイした Worker のログと分析の参照                       | Cloudflare の OAuth         |
+| `context7`                 | Hono、Vite、React などライブラリの最新ドキュメントの参照     | 不要                        |
+| `playwright`               | ブラウザを操作してダッシュボードの動作を確かめる             | 不要（初回に `npx` で取得） |
+
+`cloudflare-bindings` と `cloudflare-observability` は、初めて使うときにブラウザで Cloudflare へのログインを求められる（Claude Code では `/mcp` から認証する）。本番のリソースにも触れるので、操作を許可する前に対象のアカウントとリソースを確かめる。
+
 ## デプロイ
 
 本番用の `routes` と D1 の `database_id` は `apps/tracker/wrangler.jsonc` に未設定。技術定義書 9 章に沿って設定してから `pnpm --filter @errorcloud/tracker deploy` を実行する。
