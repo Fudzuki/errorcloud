@@ -140,9 +140,22 @@ Worker 名は `cloudflare.script_name`、`service.name`、`faas.name` の順に�
 
 ## デプロイ
 
-本番用の `routes` と D1 の `database_id` は `apps/tracker/wrangler.jsonc` に未設定。技術定義書 9 章に沿って設定してから `pnpm --filter @errorcloud/tracker deploy` を実行する。
+```sh
+pnpm --filter @errorcloud/tracker exec wrangler login
+pnpm --filter @errorcloud/tracker deploy
+```
 
-管理用の `/api/*` は Worker 側でも Cloudflare Access の JWT を検証する。Access アプリケーションを作ったら、次の 2 つをシークレットに入れる（未設定のあいだ `/api/*` は 503 を返す）。
+`wrangler.jsonc` にはアカウント固有の ID を書いていない。初回のデプロイで、wrangler の自動プロビジョニングが D1（`errorcloud`）、R2（`errorcloud`）、Queue（`errorcloud-ingest`）を作って Worker に紐づけ、以後のデプロイでもその紐づけを保つ。同じ設定のまま複数のアカウントにデプロイできる。ログインしているアカウントが複数あるときは `CLOUDFLARE_ACCOUNT_ID` で対象を指定する。
+
+デプロイ先は既定で `https://errorcloud.<サブドメイン>.workers.dev`。独自ドメインで動かす場合は `routes` を追加する（技術定義書 9 章）。
+
+### Cloudflare Access
+
+管理用の `/api/*` は Worker 側でも Cloudflare Access の JWT を検証する。未設定のあいだ `/api/*` は 503 を返す。
+
+1. Workers & Pages → errorcloud → Domains で、workers.dev の **Enable Access** を押す（独自ドメインの場合は、そのホスト名に Access アプリケーションを作る）
+2. Zero Trust → Access → Applications で Self-hosted のアプリケーションを作り、宛先に `<ホスト名>/_e` と `<ホスト名>/otlp` を入れ、Action が Bypass、Include が Everyone のポリシーを付ける。受信口は Worker 側で公開キーや取り込みトークンを確かめる
+3. Access アプリケーションの値をシークレットに入れる
 
 ```sh
 cd apps/tracker
