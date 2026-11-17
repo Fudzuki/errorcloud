@@ -1,0 +1,58 @@
+# main の package.json の version がまだ npm にない場合、そのパッケージを公開する。
+# npm の Trusted Publishing（OIDC）で認証するので、npm のトークンはリポジトリに置かない。
+# 設定手順はルートの README の「パッケージの公開」を参照。
+name: Publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/browser/**"
+      - "packages/cli/**"
+      - ".github/workflows/publish.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # npm の Trusted Publisher の設定で、この environment 名を指定している
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # npm の OIDC 認証と provenance に使う
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4 # package.json の packageManager のバージョンを使う
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing には npm 11.5.1 以上が必要
+      - run: npm install -g npm@11
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @errorcloud/browser --filter @errorcloud/cli test
+
+      - name: 未公開のバージョンを公開する
+        run: |
+          for dir in packages/browser packages/cli; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version は公開済み"
+              continue
+            fi
+            # 0.2.0-beta.1 のようなプレリリースは latest にしない
+            tag=latest
+            case "$version" in *-*) tag=next ;; esac
+            echo "$name@$version を公開する（タグ: $tag）"
+            (cd "$dir" && pnpm run build && npm publish --tag "$tag" --ignore-scripts)
+          done
