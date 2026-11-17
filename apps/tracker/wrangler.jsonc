@@ -22,6 +22,11 @@
     "producers": [{ "binding": "INGEST", "queue": "errorcloud-ingest" }],
     "consumers": [{ "queue": "errorcloud-ingest", "max_batch_size": 100, "max_batch_timeout": 5 }]
   },
+  // 受信口の流量制限。プロジェクトとクライアントの組ごとに1分あたりの件数を絞る。
+  // 無料プランで使えない場合はこの項目を消せば、流量制限なしで動く（技術定義書 11章）
+  "ratelimits": [
+    { "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } }
+  ],
   "triggers": { "crons": ["0 18 * * *"] },
   "observability": { "enabled": true }
 }
