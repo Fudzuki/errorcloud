@@ -1,0 +1,95 @@
+# development に変更が入るたびに、main へのリリース PR を作る（あれば本文を更新する）。
+# 本文には、まだ main に入っていない PR と公開されるパッケージを並べる（scripts/release/release-pr-body.sh）。
+# マージは人が行い、main への push で publish.yml が npm に公開する。
+# 前提: Settings > Actions > General の「Allow GitHub Actions to create and approve pull requests」を有効にする。
+name: Release PR
+
+on:
+  push:
+    branches: [development]
+  workflow_dispatch:
+
+# 続けて push されたら、古い実行は取り消してよい（PR の本文は最新の development から作り直す）。
+concurrency:
+  group: release-pr
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # GITHUB_TOKEN で作った PR では pull_request のワークフローが走らない。
+  # ここで development の先頭を検証すると、同じコミットを head に持つリリース PR にチェックとして出る。
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4 # package.json の packageManager のバージョンを使う
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  release-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write # ラベルを作る
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      LABEL: release
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: リリース PR を作る（あれば更新する）
+        run: |
+          git fetch origin main development
+
+          count="$(git rev-list --count origin/main..origin/development)"
+          # フォークの同名ブランチ（development）からの PR は拾わない
+          existing="$(gh pr list -R "$REPO" --state open --base main --head development \
+            --json number,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository | not)][0].number // empty')"
+
+          if [ "$count" = 0 ]; then
+            echo "main に入っていない変更はありません。"
+            exit 0
+          fi
+
+          body="$RUNNER_TEMP/release-pr-body.md"
+          BASE=origin/main HEAD=origin/development scripts/release/release-pr-body.sh >"$body"
+          pr_count="$(grep -m1 -oE '含まれる PR（[0-9]+ 件）' "$body" | grep -oE '[0-9]+')"
+          title="リリース: development → main（PR ${pr_count} 件）"
+
+          gh label create "$LABEL" -R "$REPO" --color 0E8A16 \
+            --description "development → main のリリース PR（自動で作る）" 2>/dev/null || true
+
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" -R "$REPO" --title "$title" --body-file "$body"
+            url="$(gh pr view "$existing" -R "$REPO" --json url --jq .url)"
+          else
+            url="$(gh pr create -R "$REPO" --base main --head development \
+              --title "$title" --body-file "$body" --label "$LABEL")"
+          fi
+
+          {
+            echo "## リリース PR"
+            echo
+            echo "$url"
+            echo
+            cat "$body"
+          } >>"$GITHUB_STEP_SUMMARY"
