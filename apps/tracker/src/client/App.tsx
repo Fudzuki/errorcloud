@@ -1,19 +1,35 @@
-import { useQuery } from "@tanstack/react-query";
+import { IssuePage } from "./pages/IssuePage";
+import { OverviewPage } from "./pages/OverviewPage";
+import { ProjectPage } from "./pages/ProjectPage";
+import { Link, useLocation } from "./router";
+
+function route(pathname: string) {
+  let m = /^\/projects\/([^/]+)(?:\/(settings))?\/?$/.exec(pathname);
+  if (m?.[1]) {
+    return <ProjectPage projectId={decodeURIComponent(m[1])} tab={m[2] ? "settings" : "issues"} />;
+  }
+  m = /^\/issues\/([^/]+)\/?$/.exec(pathname);
+  if (m?.[1]) return <IssuePage issueId={decodeURIComponent(m[1])} />;
+  if (pathname === "/" || pathname === "") return <OverviewPage />;
+  return (
+    <div className="empty">
+      <p>ページが見つかりません。</p>
+      <Link href="/">概況へ戻る</Link>
+    </div>
+  );
+}
 
 export function App() {
-  const health = useQuery({
-    queryKey: ["health"],
-    queryFn: async () => {
-      const res = await fetch("/api/health");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return (await res.json()) as { ok: boolean };
-    },
-  });
-
+  const { pathname } = useLocation();
   return (
-    <main>
-      <h1>errorcloud</h1>
-      <p>API: {health.isPending ? "確認中…" : health.data?.ok ? "OK" : "NG"}</p>
-    </main>
+    <>
+      <header className="topbar">
+        <Link href="/" className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          errorcloud
+        </Link>
+      </header>
+      <main className="main">{route(pathname)}</main>
+    </>
   );
 }

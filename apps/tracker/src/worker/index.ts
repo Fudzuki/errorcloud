@@ -1,49 +1,63 @@
 import { Hono } from "hono";
+import { requireAccess } from "./api/access";
+import { api } from "./api/routes";
+import type { AppEnv, IngestMessage } from "./env";
+import { receiver } from "./ingest/receiver";
+import { ensureMigrated } from "./migrate";
+import { processMessages } from "./pipeline/consumer";
+import { runRetention } from "./retention";
 
-// 1リクエストを1メッセージとしてQueueに積む（技術定義書 3章）
-export type IngestMessage = {
-  kind: "browser";
-  receivedAt: number;
-  body: string;
-};
+export type { IngestMessage } from "./env";
 
-const MAX_PAYLOAD_BYTES = 64 * 1024;
+const app = new Hono<{ Bindings: AppEnv }>();
 
-const app = new Hono<{ Bindings: Env }>();
+app.route("/_e", receiver);
 
 app.get("/api/health", async (c) => {
   const row = await c.env.DB.prepare("SELECT 1 AS ok").first<{ ok: number }>();
   return c.json({ ok: row?.ok === 1 });
 });
 
-app.post("/_e/v1/events", async (c) => {
-  const body = await c.req.text();
-  if (new TextEncoder().encode(body).byteLength > MAX_PAYLOAD_BYTES) {
-    return c.body(null, 413);
-  }
-  // TODO: 公開キー・Origin・流量制限の検証（段階1）
-  await c.env.INGEST.send({
-    kind: "browser",
-    receivedAt: Date.now(),
-    body,
-  } satisfies IngestMessage);
-  return c.body(null, 202);
+app.use("/api/*", requireAccess());
+app.use("/api/*", async (c, next) => {
+  await ensureMigrated(c.env.DB);
+  return next();
+});
+app.route("/api", api);
+app.all("/api/*", (c) => c.json({ error: "not found" }, 404));
+
+app.onError((err, c) => {
+  console.error(err);
+  return c.json({ error: "internal error" }, 500);
 });
 
 export default {
   fetch: app.fetch,
 
-  async queue(batch: MessageBatch<IngestMessage>, _env: Env): Promise<void> {
-    // TODO: 正規化、フィンガープリント計算、D1/R2への書き込み（技術定義書 3章）
-    for (const message of batch.messages) {
-      console.log("ingest", message.body.kind, message.body.body.length);
-      message.ack();
+  async queue(
+    batch: MessageBatch<IngestMessage>,
+    env: AppEnv,
+    _ctx: ExecutionContext,
+  ): Promise<void> {
+    await ensureMigrated(env.DB);
+    try {
+      const result = await processMessages(
+        env,
+        batch.messages.map((m) => m.body),
+      );
+      console.log("ingest batch", { messages: batch.messages.length, ...result });
+      batch.ackAll();
+    } catch (err) {
+      // バッチ単位でまとめて書くので、失敗したらバッチ全体をやり直す
+      console.error("ingest batch failed", err);
+      batch.retryAll({ delaySeconds: 30 });
     }
   },
 
-  async scheduled(_controller: ScheduledController, _env: Env): Promise<void> {
-    // TODO: 保持期間を過ぎたデータの削除（技術定義書 4章）
+  async scheduled(_controller: ScheduledController, env: AppEnv, ctx: ExecutionContext) {
+    await ensureMigrated(env.DB);
+    ctx.waitUntil(runRetention(env));
   },
-} satisfies ExportedHandler<Env, IngestMessage>;
+} satisfies ExportedHandler<AppEnv, IngestMessage>;
 
 export { app };
